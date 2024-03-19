@@ -1,1 +1,7 @@
 the first step is to scoring the invoicing data of each retailers. We are provided with the invoicing data of each granted retailer in its district by the government bureau. Under the suggestion of tobacco procsessions, we selected some important indexes to protrary the saling behavoir of each retailer. 
+
+## Step1 data cleaning and Index building
+```
+import numpy as np
+import pandas as pd
+```
