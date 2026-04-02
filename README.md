@@ -1,4 +1,4 @@
-# Retail Pharma Insights: Data Tracking and Modeling During My Digital Consulting Internship
+# Retail Anomaly Detection: Data Tracking and Modeling During My Digital Consulting Internship
 
 **Internship at:** Ipsos, Digital Consulting  
 **Duration:** Jul 2023 – Oct 2024  
