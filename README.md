@@ -1,15 +1,8 @@
 # Retail Anomaly Detection: Data Tracking and Modeling During My Digital Consulting Internship
 
 **Internship at:** Ipsos, Digital Consulting  
-**Duration:** Jul 2023 – Oct 2024  
+**Duration:** Jul 2023 – Nov 2023  
 **Location:** Shanghai, China
-
-## Project Background
-We serves a seires of tobacco bureaus. 
-
-## Challenges
-data fraud
-data imcompleteness
 
 Retail store scan-quality anomaly detection pipeline — from unsupervised scoring
 to a deployable REST API with synthetic data generation.
