@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount trained models and MLflow runs (created by train.py)
+      - ./models:/app/models:ro
+      - ./mlruns:/app/mlruns:ro
+    environment:
+      - MLFLOW_TRACKING_URI=./mlruns
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout:   5s
+      retries:   3
+
+  # Optional: MLflow UI on port 5000
+  mlflow:
+    image: python:3.11-slim
+    command: >
+      bash -c "pip install mlflow -q &&
+               mlflow ui --host 0.0.0.0 --port 5000 --backend-store-uri /mlruns"
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlruns:ro
+    profiles:
+      - mlflow   # start with: docker compose --profile mlflow up

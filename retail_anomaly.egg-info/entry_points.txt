@@ -1,0 +1,3 @@
+[console_scripts]
+retail-generate = retail_anomaly.cli:generate
+retail-score = retail_anomaly.cli:score

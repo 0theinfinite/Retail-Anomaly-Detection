@@ -1,0 +1,73 @@
+# configs/default.yaml
+# All hyperparameters in one place. Override per-experiment with configs/experiment_name.yaml
+
+data:
+  score_cols:
+    - 开机天数
+    - 包销售比例
+    - 日扫码稳定性指数
+    - 扫码间隔时间
+    - 日均扫码品牌宽度
+    - 存销比
+    - 销订比
+    - 进销存偏移率
+    - 单笔量
+    - 库存变化比
+    - 经营匹配指数
+  id_col:    客户编码
+  city_col:  地市编码
+  label_col: 质量存疑   # 1 = flagged, 0 = clean; column may be absent
+
+scorer:
+  # Outlier detection
+  iqr_multiplier:    1.5    # IQR fence for clean-subset KDE fitting
+  iso_contamination: 0.08   # IsolationForest expected anomaly fraction
+
+  # Factor analysis
+  n_factors:         auto   # "auto" → parallel analysis (95th pct); or integer
+  pa_n_iter:         200    # parallel analysis Monte Carlo iterations
+  pa_percentile:     95
+
+  # KDE scoring
+  kde_bw_method:     scott  # bandwidth selector passed to scipy gaussian_kde
+
+classifier:
+  # Phase 1 supervised layer (LightGBM)
+  model:             lightgbm
+  n_estimators:      400
+  learning_rate:     0.05
+  max_depth:         4
+  cv_folds:          5
+  random_state:      42
+
+cvae:
+  # Architecture
+  z_dim:       3       # latent dimension (matches n_factors from LFM)
+  hidden_dim:  64
+  n_cities:    3       # one-hot city conditioning
+
+  # Training
+  epochs:           200
+  batch_size:        64
+  lr:              3e-4
+  beta_start:       0.0   # KL annealing: start weight
+  beta_end:         1.0   # KL annealing: end weight
+  beta_warmup_epochs: 50  # linear ramp over this many epochs
+  free_bits:        0.5   # per-latent-dim KL floor (nats)
+  random_seed:       42
+
+  # Synthetic generation
+  n_synthetic:    100_000
+  city_weights:          # sampling proportions for A / B / C
+    A: 0.25
+    B: 0.50
+    C: 0.25
+
+api:
+  host:  0.0.0.0
+  port:  8000
+  reload: false
+
+mlflow:
+  tracking_uri:  ./mlruns
+  experiment:    retail-anomaly
