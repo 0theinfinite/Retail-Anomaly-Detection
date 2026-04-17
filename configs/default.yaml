@@ -71,3 +71,25 @@ api:
 mlflow:
   tracking_uri:  ./mlruns
   experiment:    retail-anomaly
+
+pipeline:
+  # Step 2 — LFM feature extraction
+  lfm:
+    n_factors: 3          # validated via parallel analysis + CV, see notebooks/01_analysis.ipynb
+    rotation: varimax
+    sign_alignment: true
+
+  # Step 3 — Self-Training
+  self_training:
+    threshold_pos: 0.85   # add pseudo-label as flagged if proba > this
+    threshold_neg: 0.15   # add pseudo-label as normal if proba < this
+    max_iter: 5
+    min_new_samples: 1    # stop if fewer than this many samples added in a round
+
+  # Step 4 — Final classifier
+  final_model:
+    type: logistic_regression
+    C: 1.0
+    class_weight: balanced
+    extra_features:
+      - daily_brand_width_score   # SHAP-validated independent contributor, see notebooks/01_analysis.ipynb

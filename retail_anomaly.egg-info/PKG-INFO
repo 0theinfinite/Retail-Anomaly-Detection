@@ -27,7 +27,11 @@ Requires-Dist: httpx>=0.26; extra == "dev"
 Requires-Dist: ruff>=0.2; extra == "dev"
 Requires-Dist: mypy>=1.8; extra == "dev"
 
-# Retail-Anomaly-Detection
+# Retail Anomaly Detection: Data Tracking and Modeling During My Digital Consulting Internship
+
+**Internship at:** Ipsos, Digital Consulting  
+**Duration:** Jul 2023 – Nov 2023  
+**Location:** Shanghai, China
 
 Retail store scan-quality anomaly detection pipeline — from unsupervised scoring
 to a deployable REST API with synthetic data generation.

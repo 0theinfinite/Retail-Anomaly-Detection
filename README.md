@@ -4,49 +4,53 @@
 **Duration:** Jul 2023 – Nov 2023  
 **Location:** Shanghai, China
 
-Retail store scan-quality anomaly detection pipeline — from unsupervised scoring
-to a deployable REST API with synthetic data generation.
+Retail store scan-quality anomaly detection pipeline — semi-supervised scoring,
+interpretable factor analysis, and a deployable REST API.
 
 > **Context**: tobacco retailers submit daily scan data to a market-research platform.
-> Data quality varies widely (刷单 fraud, incomplete scans, mis-keyed inventory).
-> This system scores each store, flags anomalies, and generates privacy-safe synthetic
-> data for public benchmarking.
+> Data quality varies widely (scan fraud, incomplete scans, mis-keyed inventory).
+> This system scores each store and flags anomalies using a three-step pipeline:
+> LFM feature extraction → Self-Training pseudo-labelling → Logistic Regression classifier.
+
+> **Privacy**: all store identifiers in this repository have been masked
+> (`STORE_NNNNN` format). No personally identifiable information is present.
 
 ---
 
 ## Pipeline overview
 
 ```
-Raw store indicators (11 cols)
-        │
-        ▼
-┌───────────────────┐
-│  Phase 0 · LFM    │  KDE scoring + varimax factor analysis
-│  ImprovedLFM      │  → composite quality score [0,100]
-│  AUC 0.84         │  → 3 interpretable factors
-└────────┬──────────┘
-         │ factor scores + KDE scores
-         ▼
-┌───────────────────┐
-│  Phase 1 · GBDT   │  LightGBM classifier on LFM features
-│  AnomalyClassifier│  StratifiedKFold CV · SHAP explanations
-│  AUC 0.91+        │  → P(anomaly) per store
-└────────┬──────────┘
-         │ fitted LFM loadings Λ
-         ▼
-┌───────────────────┐
-│  Phase 2 · CVAE   │  Conditional VAE (city-conditioned)
-│  RetailCVAE       │  decoder warm-started from LFM Λ
-│  KS p > 0.05      │  → 100k synthetic rows (public-safe)
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│  Phase 3 · API    │  FastAPI · Docker · MLflow
-│  /score           │  POST batch stores → quality scores
-│  /generate        │  POST → synthetic data
-│  /report          │  GET  → city-level summary
-└───────────────────┘
+11 indicator score columns  (3,757 stores)
+            │
+            ▼
+┌─────────────────────────┐
+│  Step 1 · LFM           │  Varimax factor analysis on all 3,757 rows
+│  LFMFeatureExtractor    │  → 3 orthogonal factors (52.2% variance)
+│  unsupervised           │  F1: Transaction behaviour
+│                         │  F2: Inventory-sales relationship
+└──────────┬──────────────┘  F3: Inventory deviation & activity
+           │ F_full (3757 × 3)
+           ▼
+┌─────────────────────────┐
+│  Step 2 · Self-Training │  Start: 318 labelled rows (62 flagged, 19.5%)
+│  SelfTrainer            │  5 rounds · thresholds 0.85 / 0.15
+│  semi-supervised        │  → 2,826 pseudo-labels added
+│                         │  → 3,144 effective training rows
+└──────────┬──────────────┘
+           │ expanded labels
+           ▼
+┌─────────────────────────┐
+│  Step 3 · Classifier    │  LogisticRegression (3 LFM factors + brand_wid)
+│  FinalClassifier        │  CV AUC: 0.875 ± 0.086
+│  supervised             │  → anomaly_proba for all 3,757 stores
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐
+│  Step 4 · API           │  FastAPI · Docker · MLflow
+│  /score  /generate      │  POST stores → anomaly probability
+│  /report                │  GET  → city-level summary
+└─────────────────────────┘
 ```
 
 ---
@@ -56,55 +60,49 @@ Raw store indicators (11 cols)
 ### 1 · Clone and install
 
 ```bash
-git clone https://github.com/garyhuang/Retail-Anomaly-Detection.git
+git clone https://github.com/yaniwu/Retail-Anomaly-Detection.git
 cd Retail-Anomaly-Detection
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-### 2 · Train on demo data (no real data needed)
+### 2 · Run the pipeline
 
 ```bash
-python scripts/train.py --demo
+python scripts/pipeline.py --data data/raw/retail_processed.csv
 ```
 
-This generates 3 700 synthetic rows, runs the full pipeline, and writes
-results to `mlruns/` and `data/synthetic/`.
+Outputs written to `reports/`:
 
-### 3 · View MLflow experiment results
+| File | Contents |
+|---|---|
+| `factor_loadings.csv` | Varimax loadings (11 indicators × 3 factors) |
+| `self_training_log.csv` | Pseudo-labels added per round |
+| `city_summary.csv` | City-level anomaly rates |
+| `all_scores.csv` | Per-store F1/F2/F3 + anomaly probability |
+| `models/final_clf.pkl` | Serialised final classifier |
+
+### 3 · Generate PDF report
 
 ```bash
-mlflow ui          # open http://localhost:5000
+python scripts/generate_report.py
+# → reports/pipeline_report.pdf  (5 pages)
 ```
 
-### 4 · One-command Docker demo
+### 4 · Open analysis notebook
+
+```bash
+jupyter lab notebooks/01_analysis.ipynb
+```
+
+The notebook justifies four design choices with experiments and visualisations:
+§1 Why dimensionality reduction · §2 Why LFM over PCA/entropy · §3 Why 3 factors · §4 Why LR as base model
+
+### 5 · One-command Docker demo
 
 ```bash
 docker compose up --build
 curl http://localhost:8000/health
-```
-
-### 5 · Score a batch of stores
-
-```bash
-curl -X POST http://localhost:8000/score \
-  -H "Content-Type: application/json" \
-  -d '{
-    "stores": [{
-      "客户编码":         "cust000001",
-      "地市编码":         "B",
-      "开机天数":         30,
-      "包销售比例":       0.92,
-      "日扫码稳定性指数": 0.38,
-      "扫码间隔时间":     14.5,
-      "日均扫码品牌宽度": 18.2,
-      "存销比":           0.65,
-      "销订比":           0.87,
-      "进销存偏移率":     0.001,
-      "单笔量":           0.19,
-      "库存变化比":       1.22,
-      "经营匹配指数":     4.5
-    }]
-  }'
 ```
 
 ---
@@ -113,29 +111,46 @@ curl -X POST http://localhost:8000/score \
 
 ```
 Retail-Anomaly-Detection/
+├── configs/
+│   └── default.yaml              # All hyperparameters (LFM, self-training, classifier)
+├── data/
+│   ├── raw/                      # gitignored — retail_processed.csv, retail_raw.csv
+│   └── synthetic/                # gitignored — CVAE output
+├── notebooks/
+│   ├── 01_analysis.ipynb         # Design decision analysis (4 sections)
+│   └── 01_analysis.html          # Pre-rendered HTML export
 ├── retail_anomaly/
+│   ├── features/
+│   │   └── lfm.py                # LFMFeatureExtractor (fit/transform)
 │   ├── scorer/
-│   │   ├── lfm.py          # Phase 0 — ImprovedLFM
-│   │   └── classifier.py   # Phase 1 — AnomalyClassifier (LightGBM + SHAP)
+│   │   ├── lfm.py                # ImprovedLFM (original KDE-based scorer)
+│   │   └── final_model.py        # FinalClassifier (LR wrapper + save/load)
+│   ├── semi/
+│   │   └── self_training.py      # SelfTrainer (pseudo-label loop)
 │   ├── cvae/
-│   │   ├── model.py        # Phase 2 — RetailCVAE
-│   │   └── validation.py   # KS test helpers
+│   │   ├── model.py              # RetailCVAE (PyTorch)
+│   │   └── validation.py         # KS test helpers
 │   ├── api/
-│   │   └── app.py          # Phase 3 — FastAPI service
+│   │   └── app.py                # FastAPI service
 │   └── utils/
-│       ├── config.py       # YAML config loader
-│       └── validation.py   # Input validation helpers
+│       ├── config.py             # YAML config loader
+│       ├── data_loader.py        # load_pipeline_data
+│       └── validation.py         # Input validation helpers
+├── scripts/
+│   ├── pipeline.py               # Main entry point (Steps 1–5)
+│   ├── generate_report.py        # 5-page PDF report generator
+│   ├── create_analysis_notebook.py  # Notebook generator (run once)
+│   └── archive/
+│       └── train_unsupervised.py # Original unsupervised script
+├── reports/
+│   ├── factor_loadings.csv       # committed
+│   ├── model_comparison.csv      # committed
+│   ├── shap_importance.csv       # committed
+│   └── models/                   # gitignored (pkl/npy)
 ├── tests/
 │   ├── test_lfm.py
 │   ├── test_cvae.py
 │   └── test_api.py
-├── configs/
-│   └── default.yaml        # All hyperparameters
-├── scripts/
-│   └── train.py            # End-to-end training + MLflow tracking
-├── data/
-│   ├── raw/                # gitignored — place your TSV here
-│   └── synthetic/          # gitignored — CVAE output lands here
 ├── Dockerfile
 ├── docker-compose.yml
 └── pyproject.toml
@@ -145,54 +160,74 @@ Retail-Anomaly-Detection/
 
 ## Design decisions
 
-### Why LFM instead of entropy weighting or PCA?
+Full analysis with experiments in [`notebooks/01_analysis.ipynb`](notebooks/01_analysis.ipynb).
 
-| Method | Problem |
-|---|---|
-| Entropy weighting | Ignores inter-indicator correlation; low-variance indicators (e.g. 存销比) are underweighted even when they're highly diagnostic |
-| PCA | Extracts variance-maximising components, not quality-relevant factors; no business interpretation |
-| **LFM (this work)** | Varimax factors map to named business concepts (sales structure, transaction authenticity, inventory discipline); KDE scoring makes no distributional assumption |
+### Why LFM over PCA and entropy weighting?
 
-### Why CVAE instead of plain parametric simulation?
+| Method | AUC (CV, LR) | Interpretable factors |
+|---|---|---|
+| Entropy weighting | ~0.79 | No — single composite |
+| PCA | ~0.85 | No — variance axes |
+| **LFM (varimax)** | **~0.875** | Yes — named business factors |
 
-The CVAE learns the joint distribution of all 11 indicators and city-level
-effects simultaneously. Decoder warm-started from LFM loadings Λ —
-exploiting the theoretical connection:
+LFM achieves the highest CV AUC and its varimax-rotated factors map to
+named business concepts: transaction behaviour (F1), inventory-sales
+relationship (F2), inventory deviation and activity (F3).
 
-> LFM is the linear Gaussian special case of a VAE.
-> (*STAT 32100 VAE lecture, Slide 45*)
+### Why 3 factors?
 
-This means the CVAE starts from a statistically principled initialisation and
-converges faster on small datasets (n ≈ 3 700).
+Parallel analysis (Horn 1965, n_iter=200, 95th percentile) recommends 3 factors.
+The Kaiser criterion (λ > 1) agrees. Three factors explain 52.2% of standardised
+variance — see `reports/factor_loadings.csv`.
 
-### Key bug fixed during development
+### Why Self-Training with LR as base model?
 
-Factor regression scores have **arbitrary eigenvector sign** (−v is as valid
-as v). Without alignment, the composite can be inverted, giving AUC 0.16
-instead of 0.84. Fix: align each factor's sign against the mean KDE score
-before aggregation.
+With only 318 labelled rows (62 positive), LR outperforms LightGBM on CV AUC
+due to its lower model complexity. LR's sigmoid output is also better calibrated
+(lower ECE), producing more reliable probability estimates for the 0.85/0.15
+pseudo-label thresholds. See §4 of the analysis notebook for calibration curves
+and threshold sensitivity analysis.
+
+### Key bug: eigenvector sign ambiguity
+
+Factor regression scores have arbitrary eigenvector sign (−v is as valid as +v).
+Without alignment, the composite score is inverted, producing AUC ≈ 0.28 instead
+of 0.87. Fix: align each factor column so it correlates positively with the row
+mean of the standardised input matrix before computing the composite.
 
 ---
 
 ## Results
 
-| Method | AUC | Mann-Whitney p |
+| Model | CV AUC | Notes |
 |---|---|---|
-| LFM improved (KDE + varimax) | **0.84** | < 1e-100 |
-| LFM original (sigmoid + communality) | 0.50 | n.s. |
-| PCA | 0.42 | n.s. |
+| LR · 3 LFM factors | **0.875 ± 0.086** | Best; pipeline default |
+| RF · 11 scores | 0.868 ± 0.082 | |
+| LR · 11 scores | 0.852 ± 0.066 | baseline |
+| LightGBM · factors + scores | 0.849 ± 0.050 | |
 
-CVAE synthetic data: **11/11 indicators** pass KS test at α = 0.05.
+Self-Training expanded the labelled set from **318 → 3,144 rows** over 5 rounds.
 
-City A identified as outlier (mean score 44 vs 67 for B/C) — diagnosed as
-systematic 按条刷单 (scan-by-stick fraud) via factor decomposition.
+City anomaly rates (predicted): **A = 12.5%  ·  B = 31.5%  ·  C = 37.5%**
+
+---
+
+## Data
+
+| File | Rows | Columns | Description |
+|---|---|---|---|
+| `retail_processed.csv` | 3,757 | 14 | 11 score columns + label (318 labelled) |
+| `retail_raw.csv` | 3,757 | 24 | Raw behavioural indicators |
+| `retail_labels.csv` | 3,757 | 3 | ID + city + label only |
+
+All store identifiers are masked (`STORE_00001` – `STORE_03757`).
 
 ---
 
 ## Running tests
 
 ```bash
-pytest                          # all tests + coverage report
+pytest                          # all tests
 pytest tests/test_lfm.py -v     # scorer only
 pytest tests/test_api.py -v     # API only
 ```
@@ -203,26 +238,12 @@ pytest tests/test_api.py -v     # API only
 
 | Layer | Library |
 |---|---|
-| Factor analysis | NumPy / SciPy (manual varimax) |
-| Classifier | LightGBM + SHAP |
+| Factor analysis | NumPy · SciPy (varimax via SVD) |
+| Semi-supervised | scikit-learn (self-training loop) |
+| Classifier | scikit-learn LogisticRegression |
 | Generative model | PyTorch (CVAE) |
 | API | FastAPI + Uvicorn |
 | Experiment tracking | MLflow |
 | Containerisation | Docker / docker-compose |
+| Reporting | matplotlib · PdfPages |
 | Testing | pytest + httpx |
-| Linting | ruff |
-
----
-
-## Roadmap
-
-- [ ] Persist fitted models to MLflow artifact store
-- [ ] Add `/retrain` endpoint for online updates
-- [ ] Latent traversal visualisation notebook
-- [ ] Scale KDE fitting to 1 M+ rows via stratified subsampling
-
----
-
-## License
-
-MIT

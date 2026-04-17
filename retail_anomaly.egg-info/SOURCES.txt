@@ -12,11 +12,16 @@ retail_anomaly/api/app.py
 retail_anomaly/cvae/__init__.py
 retail_anomaly/cvae/model.py
 retail_anomaly/cvae/validation.py
+retail_anomaly/features/__init__.py
+retail_anomaly/features/lfm.py
 retail_anomaly/scorer/__init__.py
-retail_anomaly/scorer/classifier.py
+retail_anomaly/scorer/final_model.py
 retail_anomaly/scorer/lfm.py
+retail_anomaly/semi/__init__.py
+retail_anomaly/semi/self_training.py
 retail_anomaly/utils/__init__.py
 retail_anomaly/utils/config.py
+retail_anomaly/utils/data_loader.py
 retail_anomaly/utils/validation.py
 tests/test_api.py
 tests/test_cvae.py

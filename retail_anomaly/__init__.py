@@ -12,12 +12,12 @@ Quick start
 >>> result_df, _, _ = model.fit_transform(df)
 """
 from retail_anomaly.scorer.lfm import ImprovedLFM
-from retail_anomaly.scorer.classifier import AnomalyClassifier
+from retail_anomaly.scorer.final_model import FinalClassifier
 
 try:
     from retail_anomaly.cvae.model import RetailCVAE
-    __all__ = ["ImprovedLFM", "AnomalyClassifier", "RetailCVAE"]
+    __all__ = ["ImprovedLFM", "FinalClassifier", "RetailCVAE"]
 except Exception:
-    __all__ = ["ImprovedLFM", "AnomalyClassifier"]
+    __all__ = ["ImprovedLFM", "FinalClassifier"]
 
 __version__ = "0.1.0"
