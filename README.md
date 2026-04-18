@@ -1,8 +1,7 @@
-# Retail Anomaly Detection: Data Tracking and Modeling During My Digital Consulting Internship
+# Semi-Supervised Anomaly Detection in Noisy Retail Data: An Interpretable Scoring Pipeline
 
 
-Retail store scan-quality anomaly detection pipeline — semi-supervised scoring,
-interpretable factor analysis, and a deployable REST API.
+A three-stage pipeline combining latent factor modeling, self-training, and logistic regression to identify anomalous patterns under extreme label sparsity.
 
 > **Context**: Context: distributed retail outlets submit daily transaction logs to a centralized analytics platform.
 > Data quality varies significantly due to inconsistent reporting, missing entries, and input errors.
