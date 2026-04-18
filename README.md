@@ -4,10 +4,11 @@
 Retail store scan-quality anomaly detection pipeline — semi-supervised scoring,
 interpretable factor analysis, and a deployable REST API.
 
-> **Context**: tobacco retailers submit daily scan data to a market-research platform.
-> Data quality varies widely (scan fraud, incomplete scans, mis-keyed inventory).
-> This system scores each store and flags anomalies using a three-step pipeline:
-> LFM feature extraction → Self-Training pseudo-labelling → Logistic Regression classifier.
+> **Context**: Context: distributed retail outlets submit daily transaction logs to a centralized analytics platform.
+> Data quality varies significantly due to inconsistent reporting, missing entries, and input errors.
+> This system evaluates data reliability at the unit level and flags anomalous patterns using a three-step pipeline:
+> LFM-based feature extraction → self-training pseudo-labeling → logistic regression classification.
+
 
 > **Privacy**: all store identifiers in this repository have been masked
 > (`STORE_NNNNN` format). No personally identifiable information is present.
