@@ -10,8 +10,9 @@ interpretable factor analysis, and a deployable REST API.
 > LFM-based feature extraction → self-training pseudo-labeling → logistic regression classification.
 
 
-> **Privacy**: all store identifiers in this repository have been masked
-> (`STORE_NNNNN` format). No personally identifiable information is present.
+> **Privacy**: all store identifiers in this repository have been masked (`STORE_NNNNN` format).
+> In addition, the underlying data distribution has been modified and partially resampled to prevent re-identification.
+> No personally identifiable information is present.
 
 ---
 
